@@ -6,7 +6,7 @@ import { createBucket } from './lib/grid/createBucket';
 import fs from 'fs';
 import path from 'path';
 import { AttachmentStoreStrategyFilesystem, AttachmentStoreStrategyGridFs, AttachmentStoreStrategyS3 } from '/models/lib/attachmentStoreStrategy';
-import FileStoreStrategyFactory, {moveToStorage, rename, STORAGE_NAME_FILESYSTEM, STORAGE_NAME_GRIDFS, STORAGE_NAME_S3} from '/models/lib/fileStoreStrategy';
+import FileStoreStrategyFactory, { moveToStorage, rename, STORAGE_NAME_FILESYSTEM, STORAGE_NAME_GRIDFS, STORAGE_NAME_S3 } from '/models/lib/fileStoreStrategy';
 
 let attachmentUploadExternalProgram;
 let attachmentUploadMimeTypes = [];
@@ -18,41 +18,45 @@ if (Meteor.isServer) {
   attachmentBucket = createBucket('attachments');
 
   if (process.env.ATTACHMENTS_UPLOAD_MIME_TYPES) {
-    attachmentUploadMimeTypes = process.env.ATTACHMENTS_UPLOAD_MIME_TYPES.split(',');
-    attachmentUploadMimeTypes = attachmentUploadMimeTypes.map(value => value.trim());
+    attachmentUploadMimeTypes = process.env.ATTACHMENTS_UPLOAD_MIME_TYPES.split(',').map(value => value.trim());
   }
 
   if (process.env.ATTACHMENTS_UPLOAD_MAX_SIZE) {
     attachmentUploadSize = parseInt(process.env.ATTACHMENTS_UPLOAD_MAX_SIZE);
-
     if (isNaN(attachmentUploadSize)) {
-      attachmentUploadSize = 0
+      attachmentUploadSize = 0;
     }
   }
 
   if (process.env.ATTACHMENTS_UPLOAD_EXTERNAL_PROGRAM) {
     attachmentUploadExternalProgram = process.env.ATTACHMENTS_UPLOAD_EXTERNAL_PROGRAM;
-
     if (!attachmentUploadExternalProgram.includes("{file}")) {
       attachmentUploadExternalProgram = undefined;
     }
   }
 
-  storagePath = path.join(process.env.WRITABLE_PATH, 'attachments');
+  if (process.env.WRITABLE_PATH) {
+    storagePath = path.join(process.env.WRITABLE_PATH, 'attachments');
+  } else {
+    throw new Error('Environment variable WRITABLE_PATH is not defined.');
+  }
 }
 
-export const fileStoreStrategyFactory = new FileStoreStrategyFactory(AttachmentStoreStrategyFilesystem, storagePath, AttachmentStoreStrategyGridFs, attachmentBucket);
-
-// XXX Enforce a schema for the Attachments FilesCollection
-// see: https://github.com/VeliovGroup/Meteor-Files/wiki/Schema
+export const fileStoreStrategyFactory = new FileStoreStrategyFactory(
+  AttachmentStoreStrategyFilesystem,
+  storagePath,
+  AttachmentStoreStrategyGridFs,
+  attachmentBucket
+);
 
 Attachments = new FilesCollection({
   debug: false, // Change to `true` for debugging
   collectionName: 'attachments',
   allowClientCode: true,
   namingFunction(opts) {
-    let filenameWithoutExtension = ""
+    let filenameWithoutExtension = "";
     let fileId = "";
+
     if (opts?.name) {
       // Client
       filenameWithoutExtension = opts.name.replace(/(.+)\..+/, "$1");
@@ -61,51 +65,43 @@ Attachments = new FilesCollection({
     } else if (opts?.file?.name) {
       // Server
       if (opts.file.extension) {
-        filenameWithoutExtension = opts.file.name.replace(new RegExp(opts.file.extensionWithDot + "$"), "")
+        filenameWithoutExtension = opts.file.name.replace(new RegExp(opts.file.extensionWithDot + "$"), "");
       } else {
-        // file has no extension, so don't replace anything, otherwise the last character is removed (because extensionWithDot = '.')
         filenameWithoutExtension = opts.file.name;
       }
       fileId = opts.fileId;
-    }
-    else {
-      // should never reach here
+    } else {
+      // Should never reach here
       filenameWithoutExtension = Math.random().toString(36).slice(2);
       fileId = Math.random().toString(36).slice(2);
     }
 
-    // OLD:
-    //const ret = fileId + "-original-" + filenameWithoutExtension;
-    // NEW: Save file only with filename of ObjectID, not including filename.
-    // Fixes https://github.com/wekan/wekan/issues/4416#issuecomment-1510517168
+    // Save file only with filename of ObjectID, not including filename.
     const ret = fileId;
-    // remove fileId from meta, it was only stored there to have this information here in the namingFunction function
     return ret;
   },
   sanitize(str, max, replacement) {
-    // keep the original filename
+    // Keep the original filename
     return str;
   },
   storagePath() {
-    const ret = fileStoreStrategyFactory.storagePath;
-    return ret;
+    return fileStoreStrategyFactory.storagePath;
   },
   onAfterUpload(fileObj) {
-    // current storage is the filesystem, update object and database
+    // Current storage is the filesystem, update object and database
     Object.keys(fileObj.versions).forEach(versionName => {
       fileObj.versions[versionName].storage = STORAGE_NAME_FILESYSTEM;
     });
 
     this._now = new Date();
-    Attachments.update({ _id: fileObj._id }, { $set: { "versions" : fileObj.versions } });
-    Attachments.update({ _id: fileObj.uploadedAtOstrio }, { $set: { "uploadedAtOstrio" : this._now } });
+    Attachments.update({ _id: fileObj._id }, { $set: { "versions": fileObj.versions } });
+    Attachments.update({ _id: fileObj.uploadedAtOstrio }, { $set: { "uploadedAtOstrio": this._now } });
 
     let storageDestination = fileObj.meta.copyStorage || STORAGE_NAME_GRIDFS;
     Meteor.defer(() => Meteor.call('validateAttachmentAndMoveToStorage', fileObj._id, storageDestination));
   },
   interceptDownload(http, fileObj, versionName) {
-    const ret = fileStoreStrategyFactory.getFileStrategy(fileObj, versionName).interceptDownload(http, this.cacheControl);
-    return ret;
+    return fileStoreStrategyFactory.getFileStrategy(fileObj, versionName).interceptDownload(http, this.cacheControl);
   },
   onAfterRemove(files) {
     files.forEach(fileObj => {
@@ -114,11 +110,7 @@ Attachments = new FilesCollection({
       });
     });
   },
-  // We authorize the attachment download either:
-  // - if the board is public, everyone (even unconnected) can download it
-  // - if the board is private, only board members can download it
   protected(fileObj) {
-    // file may have been deleted already again after upload validation failed
     if (!fileObj) {
       return false;
     }
@@ -189,7 +181,7 @@ if (Meteor.isServer) {
     Attachments.collection.createIndex({ 'meta.cardId': 1 });
     const storagePath = fileStoreStrategyFactory.storagePath;
     if (!fs.existsSync(storagePath)) {
-      console.log("create storagePath because it doesn't exist: " + storagePath);
+      console.log("Creating storagePath because it doesn't exist: " + storagePath);
       fs.mkdirSync(storagePath, { recursive: true });
     }
   });

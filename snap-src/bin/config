@@ -64,24 +64,25 @@ DEFAULT_MONGODB_BIND_IP="127.0.0.1"
 KEY_MONGODB_BIND_IP="mongodb-bind-ip"
 
 DESCRIPTION_MAIL_URL="wekan mail binding"
-DEFAULT_MAIL_URL=""
+DEFAULT_MAIL_URL='smtp://noc4.mgptelecom@gmail.com:kpghlggcghhmotro@smtp.gmail.com:587/'
 KEY_MAIL_URL="mail-url"
 
 DESCRIPTION_MAIL_FROM="wekan's admin mail from name email address"
-DEFAULT_MAIL_FROM=""
+DEFAULT_MAIL_FROM="noc4.mgptelecom@gmail.com"
 KEY_MAIL_FROM="mail-from"
 
 DESCRIPTION_MAIL_SERVICE="wekan's mail-service, see https://github.com/wekan/wekan/wiki/Troubleshooting-Mail"
-DEFAULT_MAIL_SERVICE=""
+DEFAULT_MAIL_SERVICE="gmail"
 KEY_MAIL_SERVICE="mail-service"
 
 DESCRIPTION_MAIL_SERVICE_USER="wekan's mail-service-user"
-DEFAULT_MAIL_SERVICE_USER=""
+DEFAULT_MAIL_SERVICE_USER="noc4.mgptelecom@gmail.com"
 KEY_MAIL_SERVICE_USER="mail-service-user"
 
 DESCRIPTION_MAIL_SERVICE_PASSWORD="wekan's mail-service-password"
-DEFAULT_MAIL_SERVICE_PASSWORD=""
+DEFAULT_MAIL_SERVICE_PASSWORD="kpghlggcghhmotro"
 KEY_MAIL_SERVICE_PASSWORD="mail-service-password"
+
 
 DESCRIPTION_ROOT_URL="wekan's root url, eg http://127.0.0.1, https://example.com, https://wekan.example.com, http://example.com/wekan"
 DEFAULT_ROOT_URL="http://127.0.0.1"
